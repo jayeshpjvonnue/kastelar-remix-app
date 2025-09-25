@@ -36,3 +36,17 @@ export const updateWaitlistEntry = `
         }
     }
 `;
+
+export const createWaitlistEntry = `
+    mutation CreateWaitlistEntry($metaobject: MetaobjectCreateInput!) {
+        metaobjectCreate(metaobject: $metaobject) {
+            metaobject {
+                id
+            }
+            userErrors {
+                field
+                message
+            }
+        }
+    }
+`;

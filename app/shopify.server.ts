@@ -6,6 +6,8 @@ import {
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+import { getShopifyConfig } from "./utils/config-server";
+import { GraphQLClient } from "graphql-request";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -24,6 +26,9 @@ const shopify = shopifyApp({
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),
 });
+
+const { graphqlUrl, headers } = getShopifyConfig();
+export const adminClient = new GraphQLClient(graphqlUrl, { headers });
 
 export default shopify;
 export const apiVersion = ApiVersion.January25;
