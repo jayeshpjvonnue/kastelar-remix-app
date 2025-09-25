@@ -38,3 +38,15 @@ export interface ActionData {
   message?: string;
   error?: string;
 }
+
+export interface CreateWaitlistResponse {
+  metaobjectCreate: {
+    metaobject: {
+      id: string;
+    };
+    userErrors: Array<{
+      field: string[];
+      message: string;
+    }>;
+  };
+}
