@@ -1,16 +1,17 @@
-import type { WaitlistData } from "app/routes/app._index";
+import { WaitlistData } from "app/routes/app._index";
 
 export const waitlistData: WaitlistData = {
   pageTitle: "Waitlist Dashboard",
-  updatingTitle: "Updating Waitlist Entry",
-  updatingDescription:
-    "Please wait a moment while we update the status. This should only take a few seconds.",
-  entriesTitle: "Waitlist Entries",
-  emptyStateMessage:
-    "No waitlist entries yet. Share your waitlist form to get started!",
-  tableHeadings: ["Email", "Name", "Join Date", "Status", "Actions"],
-  buttonLabels: {
-    approve: "Approve",
-    reject: "Reject",
-  },
+  emptyStateMessage: "No waitlist entries available.",
+  tableHeadings: ["Email", "Name", "Joined Date", "Status", "Actions"],
+  buttonLabels: { approve: "Approve", reject: "Reject" },
+  searchPlaceholder: "Search by email, first or last name",
+  updatingText: "Updating...",
+  sortOptions: [
+    { label: "Newest First", value: "joined_date_desc" },
+    { label: "Oldest First", value: "joined_date_asc" },
+    { label: "Show Approved", value: "status_approved" },
+    { label: "Show Rejected", value: "status_rejected" },
+    { label: "Show Pending", value: "status_pending" },
+  ],
 };

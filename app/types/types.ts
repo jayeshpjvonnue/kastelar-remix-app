@@ -25,12 +25,20 @@ export interface GraphQLResponse {
   data?: {
     metaobjects?: {
       edges: MetaobjectEdge[];
+      pageInfo: MetaobjectPageInfo;
     };
     metaobject?: MetaobjectNode;
     metaobjectUpdate?: {
       userErrors: Array<{ field: string[]; message: string }>;
     };
   };
+}
+
+export interface MetaobjectPageInfo {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  startCursor: string;
+  endCursor: string;
 }
 
 export interface ActionData {
@@ -49,4 +57,12 @@ export interface CreateWaitlistResponse {
       message: string;
     }>;
   };
+}
+
+export interface PaginationVariables {
+  first?: number;
+  last?: number;
+  after?: string | null;
+  before?: string | null;
+  query?: string | null;
 }
