@@ -47,16 +47,10 @@ export interface ActionData {
   error?: string;
 }
 
-export interface CreateWaitlistResponse {
-  metaobjectCreate: {
-    metaobject: {
-      id: string;
-    };
-    userErrors: Array<{
-      field: string[];
-      message: string;
-    }>;
-  };
+export interface CreateCustomerProp {
+  email: string;
+  firstName: string;
+  lastName: string;
 }
 
 export interface PaginationVariables {
