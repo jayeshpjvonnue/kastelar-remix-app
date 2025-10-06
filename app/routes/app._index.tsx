@@ -13,9 +13,12 @@ import {
   Spinner,
   Pagination,
   TextField,
+  Select,
+  Banner,
+  Box,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
-import { updateWaitlistEntry } from "app/mutations/waitlist";
+import { createCustomer, updateWaitlistEntry } from "app/mutations/waitlist";
 import { getMetaobject, getWaitlistEntries } from "../query/waitlist";
 import type {
   ActionData,
@@ -37,6 +40,7 @@ export interface WaitlistData {
   searchPlaceholder: string;
   updatingText: string;
   sortOptions: { label: string; value: string }[];
+  searchBtnLabel: string;
 }
 
 const fieldsToObject = (fields: MetaobjectField[]): Record<string, string> => {
@@ -67,6 +71,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       first: ITEMS_PER_PAGE,
     };
 
+    const statusQueryMap: Record<string, string> = {
+      status_approved: "fields.status:Approved",
+      status_rejected: "fields.status:Rejected",
+      status_pending: "fields.status:Pending",
+    };
+
+    if (statusQueryMap[sort]) {
+      variables.query = variables.query
+        ? `${variables.query} AND ${statusQueryMap[sort]}`
+        : statusQueryMap[sort];
+    }
+
     if (page > 1) {
       if (nextPageCursor) {
         variables.after = nextPageCursor;
@@ -93,6 +109,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         status: fields.status || "Pending",
       };
     });
+
+    if (sort === "joined_date_asc") {
+      waitlistEntries.sort(
+        (entry1, entry2) =>
+          new Date(entry1.joined_date).getTime() -
+          new Date(entry2.joined_date).getTime(),
+      );
+    } else if (sort === "joined_date_desc") {
+      waitlistEntries.sort(
+        (entry1, entry2) =>
+          new Date(entry2.joined_date).getTime() -
+          new Date(entry1.joined_date).getTime(),
+      );
+    }
 
     return {
       waitlistEntries,
@@ -122,42 +152,96 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
+
   const formData = await request.formData();
-  const actionType = formData.get("actionType");
-  const entryId = formData.get("entryId");
-  const newStatus = formData.get("status");
 
-  if (actionType === "updateStatus") {
-    try {
-      const getResponse = await admin.graphql(getMetaobject, {
-        variables: { id: entryId },
-      });
+  const requestedAction = formData.get("actionType");
+  const waitlistEntryId = formData.get("entryId");
+  const updatedStatus = formData.get("status");
 
-      const getResult: GraphQLResponse = await getResponse.json();
-      const currentFields = getResult.data?.metaobject?.fields || [];
+  try {
+    const waitlistEntryResponse = await admin.graphql(getMetaobject, {
+      variables: { id: waitlistEntryId },
+    });
+    const waitlistEntryData: GraphQLResponse =
+      await waitlistEntryResponse.json();
+    const waitlistEntryFields: MetaobjectField[] =
+      waitlistEntryData.data?.metaobject?.fields || [];
 
-      const updatedFields = currentFields.map((field) =>
-        field.key === "status" ? { ...field, value: newStatus } : field,
-      );
+    const updatedWaitlistEntryFields: MetaobjectField[] =
+      waitlistEntryFields.map((field: MetaobjectField) => ({
+        ...field,
+        value:
+          field.key === "status"
+            ? String(updatedStatus || "")
+            : String(field.value || ""),
+      }));
 
-      const updateResponse = await admin.graphql(updateWaitlistEntry, {
-        variables: { id: entryId, fields: updatedFields },
-      });
+    const waitlistEntryUpdateResponse = await admin.graphql(
+      updateWaitlistEntry,
+      {
+        variables: { id: waitlistEntryId, fields: updatedWaitlistEntryFields },
+      },
+    );
+    const waitlistEntryUpdateData: GraphQLResponse =
+      await waitlistEntryUpdateResponse.json();
+    const waitlistEntryUpdateErrors =
+      waitlistEntryUpdateData.data?.metaobjectUpdate?.userErrors || [];
 
-      const result: GraphQLResponse = await updateResponse.json();
-      const errors = result.data?.metaobjectUpdate?.userErrors || [];
-
-      if (errors.length > 0) {
-        return { success: false, error: "Failed to update status" };
-      }
-
-      return { success: true, message: "Status updated successfully" };
-    } catch (error) {
-      return { success: false, error: "Failed to update status" };
+    if (waitlistEntryUpdateErrors.length > 0) {
+      return { success: false, error: "Failed to update waitlist status" };
     }
-  }
 
-  return { success: false, error: "Invalid action" };
+    if (requestedAction === "updateStatus" && updatedStatus === "Approved") {
+      const customerData = {
+        email: String(
+          waitlistEntryFields.find(
+            (field: MetaobjectField) => field.key === "email",
+          )?.value || "",
+        ),
+        firstName: String(
+          waitlistEntryFields.find(
+            (field: MetaobjectField) => field.key === "first_name",
+          )?.value || "",
+        ),
+        lastName: String(
+          waitlistEntryFields.find(
+            (field: MetaobjectField) => field.key === "last_name",
+          )?.value || "",
+        ),
+      };
+
+      const customerCreateResponse = await admin.graphql(createCustomer, {
+        variables: { input: customerData },
+      });
+      const createCustomerData = await customerCreateResponse.json();
+      const customerCreateErrors =
+        createCustomerData.data?.customerCreate?.userErrors || [];
+
+      if (customerCreateErrors.length > 0) {
+        const waitlistRollbackFields: MetaobjectField[] = waitlistEntryFields.map(
+          (field: MetaobjectField) => ({
+            ...field,
+            value:
+              field.key === "status" ? "Pending" : String(field.value || ""),
+          }),
+        );
+
+        await admin.graphql(updateWaitlistEntry, {
+          variables: { id: waitlistEntryId, fields: waitlistRollbackFields },
+        });
+
+        return {
+          success: false,
+          error: "Failed to create customer",
+        };
+      }
+    }
+
+    return { success: true, message: "Status updated successfully" };
+  } catch (error) {
+    return { success: false, error: "Unexpected error occurred" };
+  }
 };
 
 export default function WaitlistDashboard() {
@@ -258,41 +342,77 @@ export default function WaitlistDashboard() {
     </InlineStack>,
   ]);
 
-return (
+  const handleSortChange = (value: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("sort", value);
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
+  return (
     <Page title={pageTitle}>
-      <BlockStack gap="500">
-        <Layout>
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="400">
-                {isUpdating && (
+      <Layout>
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="600">
+              {isUpdating && (
+                <Banner tone="info">
                   <InlineStack gap="200" align="center">
                     <Spinner size="small" />
-                    <Text as="span" variant="bodyMd" tone="subdued">
+                    <Text as="span" variant="bodyMd">
                       {updatingText}
                     </Text>
                   </InlineStack>
-                )}
+                </Banner>
+              )}
 
-                <InlineStack gap="200" align="end">
-                  <TextField
-                    label=""
-                    placeholder="Search by email, first or last name"
-                    value={searchInput}
-                    onChange={(value) => setSearchInput(value)}
-                    clearButton
-                    onClearButtonClick={() => setSearchInput("")}
-                    autoComplete=""
-                  />
-                  <Button onClick={handleSearchSubmit}>Search</Button>
+              <Box padding="400">
+                <InlineStack
+                  gap="400"
+                  align="space-between"
+                  blockAlign="center"
+                >
+                  <Box padding="400">
+                    <InlineStack gap="200" align="start" blockAlign="center">
+                      <Box minWidth="320px">
+                        <TextField
+                          label="Search customers"
+                          labelHidden
+                          placeholder="Email, first name, or last name"
+                          value={searchInput}
+                          onChange={setSearchInput}
+                          clearButton
+                          onClearButtonClick={() => setSearchInput("")}
+                          autoComplete="off"
+                        />
+                      </Box>
+                      <Button variant="primary" onClick={handleSearchSubmit}>
+                        {waitlistData.searchBtnLabel}
+                      </Button>
+                    </InlineStack>
+                  </Box>
+
+                  <InlineStack gap="200" blockAlign="center">
+                    <Select
+                      label="Sort by"
+                      labelHidden
+                      options={waitlistData.sortOptions}
+                      value={searchParams.get("sort") || ""}
+                      onChange={handleSortChange}
+                    />
+                  </InlineStack>
                 </InlineStack>
+              </Box>
 
+              <Box padding="400">
                 {waitlistEntries.length === 0 ? (
-                  <Text as="p" variant="bodyMd">
-                    {emptyStateMessage}
-                  </Text>
+                  <Box padding="800">
+                    <Text as="p" variant="bodyMd" alignment="center">
+                      {emptyStateMessage}
+                    </Text>
+                  </Box>
                 ) : (
-                  <>
+                  <BlockStack gap="400">
                     <DataTable
                       columnContentTypes={[
                         "text",
@@ -303,10 +423,12 @@ return (
                       ]}
                       headings={tableHeadings}
                       rows={rows}
+                      increasedTableDensity
+                      verticalAlign="middle"
                     />
 
                     {(pageInfo.hasPreviousPage || pageInfo.hasNextPage) && (
-                      <div className="flex">
+                      <Box paddingBlockStart="400">
                         <Pagination
                           hasPrevious={pageInfo.hasPreviousPage}
                           onPrevious={() => handlePageChange("previous")}
@@ -314,16 +436,15 @@ return (
                           onNext={() => handlePageChange("next")}
                           label={`Page ${currentPage}`}
                         />
-                      </div>
+                      </Box>
                     )}
-                  </>
+                  </BlockStack>
                 )}
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-        </Layout>
-      </BlockStack>
+              </Box>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+      </Layout>
     </Page>
   );
 }
-

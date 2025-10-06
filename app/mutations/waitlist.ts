@@ -22,3 +22,20 @@ export const createWaitlistEntry = `
         }
     }
 `;
+
+export const createCustomer = `
+mutation customerCreate($input: CustomerInput!) {
+        customerCreate(input: $input) {
+          customer {
+            id
+            email
+            firstName
+            lastName
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+`;

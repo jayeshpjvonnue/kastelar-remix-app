@@ -14,4 +14,5 @@ export const waitlistData: WaitlistData = {
     { label: "Show Rejected", value: "status_rejected" },
     { label: "Show Pending", value: "status_pending" },
   ],
+  searchBtnLabel: "Search",
 };
