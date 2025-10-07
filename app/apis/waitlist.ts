@@ -1,5 +1,8 @@
 import { sendCustomerInvite } from "app/mutations/waitlist";
 import { CreateCustomerProp } from "app/types/types";
+import { getShopifyConfig } from "app/utils/config-server";
+
+const { shop, headers } = getShopifyConfig();
 
 export async function createCustomerApi({
   email,
@@ -7,13 +10,10 @@ export async function createCustomerApi({
   lastName,
 }: CreateCustomerProp) {
   const response = await fetch(
-    `https://${process.env.SHOPIFY_SHOP}/admin/api/2025-10/customers.json`,
+    `https://${shop}/admin/api/2025-10/customers.json`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_API_TOKEN!,
-      },
+      headers,
       body: JSON.stringify({
         customer: { email, first_name: firstName, last_name: lastName },
       }),
@@ -32,13 +32,10 @@ export async function createCustomerApi({
 
 export async function sendCustomerInviteApi(customerId: string) {
   const response = await fetch(
-    `https://${process.env.SHOPIFY_SHOP}/admin/api/2025-01/graphql.json`,
+    `https://${shop}/admin/api/2025-01/graphql.json`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_API_TOKEN!,
-      },
+      headers,
       body: JSON.stringify({
         query: sendCustomerInvite,
         variables: { customerId },
