@@ -53,6 +53,18 @@ export interface CreateCustomerProp {
   lastName: string;
 }
 
+export interface CreateWaitlistResponse {
+  metaobjectCreate: {
+    metaobject: {
+      id: string;
+    };
+    userErrors: Array<{
+      field: string[];
+      message: string;
+    }>;
+  };
+}
+
 export interface PaginationVariables {
   first?: number;
   last?: number;

@@ -18,7 +18,7 @@ import {
   Box,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
-import { createCustomer, updateWaitlistEntry } from "app/mutations/waitlist";
+import { updateWaitlistEntry } from "app/mutations/waitlist";
 import { getMetaobject, getWaitlistEntries } from "../query/waitlist";
 import type {
   ActionData,
@@ -28,6 +28,7 @@ import type {
 } from "../types/types";
 import { waitlistData } from "app/data/waitlist";
 import { useState, useEffect, useCallback } from "react";
+import { createCustomerApi, sendCustomerInviteApi } from "app/apis/waitlist";
 
 export interface WaitlistData {
   emptyStateMessage: string;
@@ -197,12 +198,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         email: String(
           waitlistEntryFields.find(
             (field: MetaobjectField) => field.key === "email",
-          )?.value || "",
+          )?.value,
         ),
         firstName: String(
           waitlistEntryFields.find(
             (field: MetaobjectField) => field.key === "first_name",
-          )?.value || "",
+          )?.value,
         ),
         lastName: String(
           waitlistEntryFields.find(
@@ -211,30 +212,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         ),
       };
 
-      const customerCreateResponse = await admin.graphql(createCustomer, {
-        variables: { input: customerData },
-      });
-      const createCustomerData = await customerCreateResponse.json();
-      const customerCreateErrors =
-        createCustomerData.data?.customerCreate?.userErrors || [];
-
-      if (customerCreateErrors.length > 0) {
-        const waitlistRollbackFields: MetaobjectField[] = waitlistEntryFields.map(
-          (field: MetaobjectField) => ({
+      const rollbackWaitlist = async () => {
+        const waitlistRollbackFields: MetaobjectField[] =
+          waitlistEntryFields.map((field: MetaobjectField) => ({
             ...field,
             value:
               field.key === "status" ? "Pending" : String(field.value || ""),
-          }),
-        );
+          }));
 
         await admin.graphql(updateWaitlistEntry, {
           variables: { id: waitlistEntryId, fields: waitlistRollbackFields },
         });
+      };
 
-        return {
-          success: false,
-          error: "Failed to create customer",
-        };
+      try {
+        const customerResponse = await createCustomerApi(customerData);
+        const customerGID =
+          customerResponse.customer?.admin_graphql_api_id ?? null;
+
+        if (!customerGID) {
+          await rollbackWaitlist();
+          return { success: false, error: "Customer not created" };
+        }
+
+        const inviteResponse = await sendCustomerInviteApi(customerGID);
+        if (!inviteResponse.success) {
+          return {
+            success: true,
+            warning: "Customer created but invite failed",
+          };
+        }
+
+        return { success: true };
+      } catch (error) {
+        await rollbackWaitlist();
+        return { success: false, error: "Failed to create customer" };
       }
     }
 
