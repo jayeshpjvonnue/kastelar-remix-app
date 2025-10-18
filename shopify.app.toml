@@ -2,7 +2,7 @@
 
 client_id = "1e465436851bc91835a027d7e0cae139"
 name = "kastelar connect"
-application_url = "https://example.com/"
+application_url = "https://kastelar-remix-jqw0q558o-jayeshs-projects-db87986c.vercel.app"
 embedded = true
 handle = "kastelar-connect"
 
@@ -22,10 +22,15 @@ api_version = "2025-07"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products"
+scopes = "read_customers,write_customers,read_products,write_products,read_metaobjects,write_metaobjects"
+
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [
+  "https://kastelar-remix-jqw0q558o-jayeshs-projects-db87986c.vercel.app/auth/callback",
+  "https://kastelar-remix-jqw0q558o-jayeshs-projects-db87986c.vercel.app/auth/shopify/callback",
+  "https://kastelar-remix-jqw0q558o-jayeshs-projects-db87986c.vercel.app/api/auth/callback"
+]
 
 [pos]
 embedded = false
