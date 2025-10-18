@@ -32,7 +32,7 @@ export async function createCustomerApi({
 
 export async function sendCustomerInviteApi(customerId: string) {
   const response = await fetch(
-    `https://${shop}/admin/api/2025-01/graphql.json`,
+    `https://${shop}/admin/api/2025-10/graphql.json`,
     {
       method: "POST",
       headers,
@@ -51,4 +51,22 @@ export async function sendCustomerInviteApi(customerId: string) {
   }
 
   return { success: true };
+}
+
+export async function getCustomerDataApi(customerId: string) {
+  const response = await fetch(
+    `https://${shop}/admin/api/2025-10/customers/${customerId}.json`,
+
+    {
+      method: "GET",
+      headers,
+    },
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+  return data.customer;
 }
